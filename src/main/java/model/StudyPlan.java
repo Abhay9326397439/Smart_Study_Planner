@@ -6,7 +6,9 @@ import java.util.List;
 public class StudyPlan {
     private int id;
     private int userId;
-    private String repositoryName;
+    private String repositoryName;   // IT mode (GitHub repository)
+    private String subjectName;      // Legacy single subject (may be null)
+    private String subjects;         // Normal mode: comma-separated subjects
     private LocalDate deadline;
     private String difficulty;
     private int dailyHours;
@@ -15,9 +17,20 @@ public class StudyPlan {
 
     public StudyPlan() {}
 
-    public StudyPlan(int userId, String repositoryName, LocalDate deadline, String difficulty, int dailyHours) {
+    // Constructor for IT mode (with dummy boolean to differentiate)
+    public StudyPlan(int userId, String repositoryName, LocalDate deadline, String difficulty, int dailyHours, boolean isIT) {
         this.userId = userId;
         this.repositoryName = repositoryName;
+        this.deadline = deadline;
+        this.difficulty = difficulty;
+        this.dailyHours = dailyHours;
+        this.completionPercentage = 0;
+    }
+
+    // Constructor for Normal mode with multiple subjects
+    public StudyPlan(int userId, String subjects, LocalDate deadline, String difficulty, int dailyHours) {
+        this.userId = userId;
+        this.subjects = subjects;
         this.deadline = deadline;
         this.difficulty = difficulty;
         this.dailyHours = dailyHours;
@@ -33,6 +46,12 @@ public class StudyPlan {
 
     public String getRepositoryName() { return repositoryName; }
     public void setRepositoryName(String repositoryName) { this.repositoryName = repositoryName; }
+
+    public String getSubjectName() { return subjectName; }
+    public void setSubjectName(String subjectName) { this.subjectName = subjectName; }
+
+    public String getSubjects() { return subjects; }
+    public void setSubjects(String subjects) { this.subjects = subjects; }
 
     public LocalDate getDeadline() { return deadline; }
     public void setDeadline(LocalDate deadline) { this.deadline = deadline; }

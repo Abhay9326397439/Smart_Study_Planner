@@ -1,21 +1,21 @@
- package dao;
+package dao;
 
 import db.DBConnection;
 import enums.UserRole;
 import model.User;
 
 import java.sql.*;
-        import java.util.ArrayList;
+import java.util.ArrayList;
 import java.util.List;
 
 public class UserDAO {
 
     public User save(User user) {
-        String sql = "INSERT INTO users (name, email, role, oauth_provider, github_username, access_token, avatar_url) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?) " +
+        String sql = "INSERT INTO users (name, email, role, oauth_provider, github_username, access_token, avatar_url, active_plan_id) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?) " +
                 "ON DUPLICATE KEY UPDATE " +
                 "name = VALUES(name), role = VALUES(role), github_username = VALUES(github_username), " +
-                "access_token = VALUES(access_token), avatar_url = VALUES(avatar_url)";
+                "access_token = VALUES(access_token), avatar_url = VALUES(avatar_url), active_plan_id = VALUES(active_plan_id)";
 
         try (Connection conn = DBConnection.getInstance().getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -27,6 +27,7 @@ public class UserDAO {
             stmt.setString(5, user.getGithubUsername());
             stmt.setString(6, user.getAccessToken());
             stmt.setString(7, user.getAvatarUrl());
+            stmt.setObject(8, user.getActivePlanId(), Types.INTEGER); // can be null
 
             int affectedRows = stmt.executeUpdate();
             System.out.println("UserDAO.save: affectedRows = " + affectedRows);
@@ -128,7 +129,7 @@ public class UserDAO {
     }
 
     public void update(User user) {
-        String sql = "UPDATE users SET name = ?, role = ?, github_username = ?, access_token = ?, avatar_url = ? WHERE id = ?";
+        String sql = "UPDATE users SET name = ?, role = ?, github_username = ?, access_token = ?, avatar_url = ?, active_plan_id = ? WHERE id = ?";
 
         try (Connection conn = DBConnection.getInstance().getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -138,12 +139,47 @@ public class UserDAO {
             stmt.setString(3, user.getGithubUsername());
             stmt.setString(4, user.getAccessToken());
             stmt.setString(5, user.getAvatarUrl());
-            stmt.setInt(6, user.getId());
+            stmt.setObject(6, user.getActivePlanId(), Types.INTEGER);
+            stmt.setInt(7, user.getId());
 
             stmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+
+    // ✅ New method to update only the active plan
+    public void updateActivePlan(int userId, Integer planId) {
+        String sql = "UPDATE users SET active_plan_id = ? WHERE id = ?";
+        try (Connection conn = DBConnection.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            if (planId == null) {
+                stmt.setNull(1, Types.INTEGER);
+            } else {
+                stmt.setInt(1, planId);
+            }
+            stmt.setInt(2, userId);
+            stmt.executeUpdate();
+            System.out.println("UserDAO.updateActivePlan: user " + userId + " active plan set to " + planId);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // ✅ New method to get active plan ID
+    public Integer getActivePlanId(int userId) {
+        String sql = "SELECT active_plan_id FROM users WHERE id = ?";
+        try (Connection conn = DBConnection.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, userId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("active_plan_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     private User mapResultSetToUser(ResultSet rs) throws SQLException {
@@ -156,6 +192,13 @@ public class UserDAO {
         user.setGithubUsername(rs.getString("github_username"));
         user.setAccessToken(rs.getString("access_token"));
         user.setAvatarUrl(rs.getString("avatar_url"));
+        // Assuming User model has activePlanId field
+        int activePlanId = rs.getInt("active_plan_id");
+        if (!rs.wasNull()) {
+            user.setActivePlanId(activePlanId);
+        } else {
+            user.setActivePlanId(null);
+        }
         return user;
     }
 }

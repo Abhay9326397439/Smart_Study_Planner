@@ -7,14 +7,16 @@ import service.NormalPlanGenerator;
 import dao.StudyPlanDAO;
 import dao.StudyTaskDAO;
 import dao.UserDAO;
+import dao.TopicDAO;
 
 import javax.swing.*;
-        import javax.swing.border.EmptyBorder;
+import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-        import java.time.LocalDate;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,10 +39,10 @@ public class NormalStudyPlannerFrame extends JFrame {
     private DefaultListModel<String> taskListModel;
     private JList<String> taskList;
 
-    // Plan generation components
-    private JCheckBox mathCheckbox, scienceCheckbox, englishCheckbox;
-    private JCheckBox historyCheckbox, geographyCheckbox, economicsCheckbox;
-    private JCheckBox physicsCheckbox, chemistryCheckbox;
+    // Plan generation components (subjects)
+    private JCheckBox marathiCheckbox, hindiCheckbox, englishCheckbox, physicsCheckbox;
+    private JCheckBox chemistryCheckbox, biologyCheckbox, historyCheckbox, geographyCheckbox;
+    private JTextField customSubjectField;
     private JSpinner hoursSpinner;
     private JSpinner dateSpinner;
     private JComboBox<String> difficultyCombo;
@@ -56,6 +58,7 @@ public class NormalStudyPlannerFrame extends JFrame {
 
     private StudyPlanDAO studyPlanDAO;
     private StudyTaskDAO studyTaskDAO;
+    private TopicDAO topicDAO;
     private NormalPlanGenerator planGenerator;
     private StudyPlan currentPlan;
 
@@ -75,6 +78,7 @@ public class NormalStudyPlannerFrame extends JFrame {
         this.user = user;
         this.studyPlanDAO = new StudyPlanDAO();
         this.studyTaskDAO = new StudyTaskDAO();
+        this.topicDAO = new TopicDAO();
         this.planGenerator = new NormalPlanGenerator();
 
         fixUserId();
@@ -254,12 +258,19 @@ public class NormalStudyPlannerFrame extends JFrame {
     }
 
     private JPanel createDashboardPanel() {
-        JPanel panel = new JPanel(new BorderLayout(0, 25));
+        JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(Color.WHITE);
+
+        // Main content panel that will be scrollable
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(Color.WHITE);
 
         // Welcome Header
         JPanel headerPanel = new JPanel(new BorderLayout());
         headerPanel.setBackground(Color.WHITE);
+        headerPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 100));
+        headerPanel.setBorder(new EmptyBorder(20, 20, 10, 20));
 
         JLabel headerTitle = new JLabel("Dashboard");
         headerTitle.setFont(new Font("Segoe UI", Font.BOLD, 28));
@@ -281,22 +292,21 @@ public class NormalStudyPlannerFrame extends JFrame {
         headerPanel.add(titlePanel, BorderLayout.WEST);
         headerPanel.add(dateLabel, BorderLayout.EAST);
 
-        panel.add(headerPanel, BorderLayout.NORTH);
+        contentPanel.add(headerPanel);
+        contentPanel.add(Box.createVerticalStrut(10));
 
         // Stats Cards Grid
         JPanel statsGrid = new JPanel(new GridLayout(1, 3, 20, 0));
         statsGrid.setBackground(Color.WHITE);
-        statsGrid.setBorder(new EmptyBorder(10, 0, 20, 0));
+        statsGrid.setMaximumSize(new Dimension(Integer.MAX_VALUE, 150));
+        statsGrid.setBorder(new EmptyBorder(0, 20, 0, 20));
 
         statsGrid.add(createStatsCard("📋", "Total Tasks", "0"));
         statsGrid.add(createStatsCard("✅", "Completed", "0"));
         statsGrid.add(createStatsCard("📊", "Progress", "0%"));
 
-        panel.add(statsGrid, BorderLayout.CENTER);
-
-        // Progress and Tasks Section
-        JPanel bottomPanel = new JPanel(new GridLayout(1, 2, 20, 0));
-        bottomPanel.setBackground(Color.WHITE);
+        contentPanel.add(statsGrid);
+        contentPanel.add(Box.createVerticalStrut(20));
 
         // Daily Progress Card
         JPanel progressCard = new JPanel(new BorderLayout());
@@ -305,21 +315,23 @@ public class NormalStudyPlannerFrame extends JFrame {
                 BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
                 new EmptyBorder(20, 20, 20, 20)
         ));
+        progressCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200));
 
         JLabel progressTitle = new JLabel("Daily Progress");
-        progressTitle.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        progressTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
         progressTitle.setForeground(TEXT_PRIMARY);
 
         progressPercentageLabel = new JLabel("0%");
-        progressPercentageLabel.setFont(new Font("Segoe UI", Font.BOLD, 36));
+        progressPercentageLabel.setFont(new Font("Segoe UI", Font.BOLD, 48));
         progressPercentageLabel.setForeground(PRIMARY_COLOR);
+        progressPercentageLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
         dailyProgressBar = new JProgressBar(0, 100);
         dailyProgressBar.setStringPainted(true);
         dailyProgressBar.setForeground(PRIMARY_COLOR);
         dailyProgressBar.setBackground(new Color(224, 231, 255));
         dailyProgressBar.setBorderPainted(false);
-        dailyProgressBar.setPreferredSize(new Dimension(200, 20));
+        dailyProgressBar.setPreferredSize(new Dimension(200, 25));
 
         JPanel progressContent = new JPanel(new BorderLayout(0, 15));
         progressContent.setBackground(CARD_BG);
@@ -329,6 +341,9 @@ public class NormalStudyPlannerFrame extends JFrame {
         progressCard.add(progressTitle, BorderLayout.NORTH);
         progressCard.add(progressContent, BorderLayout.CENTER);
 
+        contentPanel.add(progressCard);
+        contentPanel.add(Box.createVerticalStrut(20));
+
         // Today's Tasks Card
         JPanel tasksCard = new JPanel(new BorderLayout());
         tasksCard.setBackground(CARD_BG);
@@ -336,12 +351,13 @@ public class NormalStudyPlannerFrame extends JFrame {
                 BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
                 new EmptyBorder(20, 20, 20, 20)
         ));
+        tasksCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 300));
 
         JPanel tasksHeader = new JPanel(new BorderLayout());
         tasksHeader.setBackground(CARD_BG);
 
         JLabel tasksTitle = new JLabel("Today's Tasks");
-        tasksTitle.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        tasksTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
         tasksTitle.setForeground(TEXT_PRIMARY);
 
         totalTasksLabel = new JLabel("0 tasks");
@@ -360,16 +376,94 @@ public class NormalStudyPlannerFrame extends JFrame {
         taskList.setCellRenderer(new TaskListCellRenderer());
 
         JScrollPane taskScroll = new JScrollPane(taskList);
-        taskScroll.setBorder(null);
+        taskScroll.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
         taskScroll.setPreferredSize(new Dimension(300, 200));
 
         tasksCard.add(tasksHeader, BorderLayout.NORTH);
         tasksCard.add(taskScroll, BorderLayout.CENTER);
 
-        bottomPanel.add(progressCard);
-        bottomPanel.add(tasksCard);
+        contentPanel.add(tasksCard);
+        contentPanel.add(Box.createVerticalStrut(20));
 
-        panel.add(bottomPanel, BorderLayout.SOUTH);
+        // Overall Progress Card
+        JPanel overallCard = new JPanel(new BorderLayout());
+        overallCard.setBackground(CARD_BG);
+        overallCard.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
+                new EmptyBorder(20, 20, 20, 20)
+        ));
+        overallCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 150));
+
+        JLabel overallTitle = new JLabel("Overall Progress");
+        overallTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        overallTitle.setForeground(TEXT_PRIMARY);
+
+        int totalTasks = studyTaskDAO.getTotalTaskCount(user.getId());
+        int completedTasks = studyTaskDAO.getCompletedTaskCount(user.getId());
+        int overallProgress = totalTasks > 0 ? (completedTasks * 100 / totalTasks) : 0;
+
+        JPanel overallStatsPanel = new JPanel(new GridLayout(1, 2, 20, 0));
+        overallStatsPanel.setBackground(CARD_BG);
+
+        JPanel completedPanel = new JPanel();
+        completedPanel.setLayout(new BoxLayout(completedPanel, BoxLayout.Y_AXIS));
+        completedPanel.setBackground(CARD_BG);
+
+        JLabel completedValue = new JLabel(String.valueOf(completedTasks));
+        completedValue.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        completedValue.setForeground(SUCCESS_COLOR);
+        completedValue.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel completedLabel = new JLabel("Completed");
+        completedLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        completedLabel.setForeground(TEXT_SECONDARY);
+        completedLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        completedPanel.add(completedValue);
+        completedPanel.add(completedLabel);
+
+        JPanel totalPanel = new JPanel();
+        totalPanel.setLayout(new BoxLayout(totalPanel, BoxLayout.Y_AXIS));
+        totalPanel.setBackground(CARD_BG);
+
+        JLabel totalValue = new JLabel(String.valueOf(totalTasks));
+        totalValue.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        totalValue.setForeground(PRIMARY_COLOR);
+        totalValue.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel totalLabel = new JLabel("Total Tasks");
+        totalLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        totalLabel.setForeground(TEXT_SECONDARY);
+        totalLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        totalPanel.add(totalValue);
+        totalPanel.add(totalLabel);
+
+        overallStatsPanel.add(completedPanel);
+        overallStatsPanel.add(totalPanel);
+
+        JProgressBar overallProgressBar = new JProgressBar(0, 100);
+        overallProgressBar.setValue(overallProgress);
+        overallProgressBar.setStringPainted(true);
+        overallProgressBar.setForeground(PRIMARY_COLOR);
+        overallProgressBar.setBackground(new Color(224, 231, 255));
+        overallProgressBar.setBorderPainted(false);
+        overallProgressBar.setPreferredSize(new Dimension(200, 20));
+
+        overallCard.add(overallTitle, BorderLayout.NORTH);
+        overallCard.add(overallStatsPanel, BorderLayout.CENTER);
+        overallCard.add(overallProgressBar, BorderLayout.SOUTH);
+
+        contentPanel.add(overallCard);
+        contentPanel.add(Box.createVerticalStrut(50)); // Extra space at bottom
+
+        // Add to scroll pane
+        JScrollPane mainScrollPane = new JScrollPane(contentPanel);
+        mainScrollPane.setBorder(null);
+        mainScrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        mainScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+
+        panel.add(mainScrollPane, BorderLayout.CENTER);
 
         return panel;
     }
@@ -424,7 +518,7 @@ public class NormalStudyPlannerFrame extends JFrame {
         headerLabel.setForeground(TEXT_PRIMARY);
         panel.add(headerLabel, BorderLayout.NORTH);
 
-        // MAIN CONTENT PANEL - Yeh scrollable hoga
+        // MAIN CONTENT PANEL - Scrollable
         JPanel contentWrapper = new JPanel(new BorderLayout());
         contentWrapper.setBackground(Color.WHITE);
 
@@ -435,17 +529,17 @@ public class NormalStudyPlannerFrame extends JFrame {
         // Top section - Subject selection and config
         JPanel topSection = new JPanel(new GridLayout(1, 2, 25, 0));
         topSection.setBackground(Color.WHITE);
-        topSection.setMaximumSize(new Dimension(Integer.MAX_VALUE, 400));
+        topSection.setMaximumSize(new Dimension(Integer.MAX_VALUE, 350));
 
-        // Left panel - subjects
-        JPanel leftPanel = createSubjectPanel();
+        // Left panel - Subject selection
+        JPanel leftPanel = createSubjectSelectionPanel();
         // Right panel - config
         JPanel rightPanel = createConfigPanel();
 
         topSection.add(leftPanel);
         topSection.add(rightPanel);
 
-        // Bottom section - Plan table
+        // Bottom section - Plan table (optional)
         JPanel tablePanel = createPlanTablePanel();
 
         contentPanel.add(topSection);
@@ -465,7 +559,7 @@ public class NormalStudyPlannerFrame extends JFrame {
         return panel;
     }
 
-    private JPanel createSubjectPanel() {
+    private JPanel createSubjectSelectionPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(CARD_BG);
         panel.setBorder(BorderFactory.createCompoundBorder(
@@ -478,29 +572,44 @@ public class NormalStudyPlannerFrame extends JFrame {
         title.setForeground(TEXT_PRIMARY);
         title.setBorder(new EmptyBorder(0, 0, 15, 0));
 
-        JPanel subjectsPanel = new JPanel(new GridLayout(4, 2, 15, 15));
-        subjectsPanel.setBackground(CARD_BG);
+        // Checkbox panel
+        JPanel checkPanel = new JPanel(new GridLayout(4, 2, 10, 10));
+        checkPanel.setBackground(CARD_BG);
 
-        mathCheckbox = createStyledCheckbox("Mathematics", true);
-        scienceCheckbox = createStyledCheckbox("Science", true);
-        englishCheckbox = createStyledCheckbox("English", true);
-        historyCheckbox = createStyledCheckbox("History", false);
-        geographyCheckbox = createStyledCheckbox("Geography", false);
-        economicsCheckbox = createStyledCheckbox("Economics", false);
-        physicsCheckbox = createStyledCheckbox("Physics", false);
-        chemistryCheckbox = createStyledCheckbox("Chemistry", false);
+        marathiCheckbox = new JCheckBox("Marathi");
+        hindiCheckbox = new JCheckBox("Hindi");
+        englishCheckbox = new JCheckBox("English");
+        physicsCheckbox = new JCheckBox("Physics");
+        chemistryCheckbox = new JCheckBox("Chemistry");
+        biologyCheckbox = new JCheckBox("Biology");
+        historyCheckbox = new JCheckBox("History");
+        geographyCheckbox = new JCheckBox("Geography");
 
-        subjectsPanel.add(mathCheckbox);
-        subjectsPanel.add(scienceCheckbox);
-        subjectsPanel.add(englishCheckbox);
-        subjectsPanel.add(historyCheckbox);
-        subjectsPanel.add(geographyCheckbox);
-        subjectsPanel.add(economicsCheckbox);
-        subjectsPanel.add(physicsCheckbox);
-        subjectsPanel.add(chemistryCheckbox);
+        checkPanel.add(marathiCheckbox);
+        checkPanel.add(hindiCheckbox);
+        checkPanel.add(englishCheckbox);
+        checkPanel.add(physicsCheckbox);
+        checkPanel.add(chemistryCheckbox);
+        checkPanel.add(biologyCheckbox);
+        checkPanel.add(historyCheckbox);
+        checkPanel.add(geographyCheckbox);
+
+        // Custom subject field
+        JPanel customPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        customPanel.setBackground(CARD_BG);
+        customPanel.add(new JLabel("Other:"));
+        customSubjectField = new JTextField(20);
+        customPanel.add(customSubjectField);
+
+        JPanel centerPanel = new JPanel();
+        centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
+        centerPanel.setBackground(CARD_BG);
+        centerPanel.add(checkPanel);
+        centerPanel.add(Box.createVerticalStrut(10));
+        centerPanel.add(customPanel);
 
         panel.add(title, BorderLayout.NORTH);
-        panel.add(subjectsPanel, BorderLayout.CENTER);
+        panel.add(centerPanel, BorderLayout.CENTER);
 
         return panel;
     }
@@ -554,14 +663,14 @@ public class NormalStudyPlannerFrame extends JFrame {
 
         // Buttons
         gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
-        JButton generateBtn = createStyledButton("Generate Study Plan", PRIMARY_COLOR);
-        generateBtn.addActionListener(e -> generateStudyPlan());
-        configPanel.add(generateBtn, gbc);
+        JButton createPlanBtn = createStyledButton("Create Plan", PRIMARY_COLOR);
+        createPlanBtn.addActionListener(e -> createPlan());
+        configPanel.add(createPlanBtn, gbc);
 
         gbc.gridy = 4;
-        JButton viewBtn = createStyledButton("View My Plan", SUCCESS_COLOR);
-        viewBtn.addActionListener(e -> showPlanTable());
-        configPanel.add(viewBtn, gbc);
+        JButton viewPlansBtn = createStyledButton("View My Plans", SUCCESS_COLOR);
+        viewPlansBtn.addActionListener(e -> openPlanList());
+        configPanel.add(viewPlansBtn, gbc);
 
         panel.add(title, BorderLayout.NORTH);
         panel.add(configPanel, BorderLayout.CENTER);
@@ -726,8 +835,9 @@ public class NormalStudyPlannerFrame extends JFrame {
                 "A goal-based productivity system for students.\n\n" +
                         "Features:\n" +
                         "• Google Authentication\n" +
-                        "• Personalized Study Plans\n" +
-                        "• Daily Task Tracking\n" +
+                        "• Personalized Study Plans with Topics\n" +
+                        "• Weighted Hour Distribution\n" +
+                        "• Session Planning (Learn/Practice/Review)\n" +
                         "• Progress Monitoring\n" +
                         "• Modern, Intuitive UI\n\n" +
                         "© 2026 Smart Study Planner"
@@ -781,15 +891,35 @@ public class NormalStudyPlannerFrame extends JFrame {
         List<StudyPlan> plans = studyPlanDAO.findByUserId(user.getId());
         if (!plans.isEmpty()) {
             currentPlan = plans.get(0);
+            // Also set active plan if needed (maybe from user.getActivePlanId())
             refreshDashboard();
         }
     }
 
     private void refreshDashboard() {
-        List<StudyTask> todayTasks = studyTaskDAO.findTodayTasks(user.getId());
+        System.out.println("\n=== REFRESHING DASHBOARD ===");
+
+        // If user has an active plan, get tasks for that plan
+        Integer activePlanId = user.getActivePlanId();
+        List<StudyTask> todayTasks;
+        int totalTasksOverall, completedTasksOverall;
+        if (activePlanId != null) {
+            // Get tasks for active plan only
+            todayTasks = studyTaskDAO.findTodayTasksByPlan(activePlanId); // need new method
+            totalTasksOverall = studyTaskDAO.getTotalTaskCountByPlan(activePlanId);
+            completedTasksOverall = studyTaskDAO.getCompletedTaskCountByPlan(activePlanId);
+        } else {
+            // Fallback to all tasks (legacy)
+            todayTasks = studyTaskDAO.findTodayTasks(user.getId());
+            totalTasksOverall = studyTaskDAO.getTotalTaskCount(user.getId());
+            completedTasksOverall = studyTaskDAO.getCompletedTaskCount(user.getId());
+        }
+
         int totalToday = todayTasks.size();
         int completedToday = (int) todayTasks.stream()
                 .filter(t -> "COMPLETED".equals(t.getStatus())).count();
+
+        System.out.println("Today's tasks: " + totalToday + ", Completed: " + completedToday);
 
         totalTasksLabel.setText(String.valueOf(totalToday));
         completedTasksLabel.setText(String.valueOf(completedToday));
@@ -803,17 +933,26 @@ public class NormalStudyPlannerFrame extends JFrame {
         for (StudyTask task : todayTasks) {
             String status = "COMPLETED".equals(task.getStatus()) ? "✅ " : "⬜ ";
             taskListModel.addElement(status + task.getDescription());
+            System.out.println("  Task: " + task.getDescription() + " - " + task.getStatus());
         }
         if (todayTasks.isEmpty()) {
-            taskListModel.addElement("🎉 No tasks for today! Enjoy your day.");
+            taskListModel.addElement("🎉 No tasks for today! Check your study plan.");
         }
+
+        // Update overall progress card (optional)
+        // We could show overall progress of active plan in a separate card.
+
+        revalidate();
+        repaint();
     }
 
     private void refreshStudyPlan() {
-        if (currentPlan != null) showPlanTable();
+        System.out.println("\n=== REFRESHING STUDY PLAN ===");
+        // Optionally refresh the plan table, but we now open separate windows.
     }
+
     private void refreshProfile() {
-        System.out.println("Refreshing profile...");
+        System.out.println("\n=== REFRESHING PROFILE ===");
         if (profileNameLabel != null) {
             profileNameLabel.setText(user.getName());
         }
@@ -828,44 +967,54 @@ public class NormalStudyPlannerFrame extends JFrame {
         }
     }
 
-    private void generateStudyPlan() {
-        System.out.println("\n=== GENERATE PLAN STARTED ===");
-        System.out.println("User ID: " + user.getId());
-        System.out.println("User Email: " + user.getEmail());
+    private void createPlan() {
+        // Collect selected subjects from checkboxes
+        List<String> selectedSubjects = new ArrayList<>();
+        if (marathiCheckbox.isSelected()) selectedSubjects.add("Marathi");
+        if (hindiCheckbox.isSelected()) selectedSubjects.add("Hindi");
+        if (englishCheckbox.isSelected()) selectedSubjects.add("English");
+        if (physicsCheckbox.isSelected()) selectedSubjects.add("Physics");
+        if (chemistryCheckbox.isSelected()) selectedSubjects.add("Chemistry");
+        if (biologyCheckbox.isSelected()) selectedSubjects.add("Biology");
+        if (historyCheckbox.isSelected()) selectedSubjects.add("History");
+        if (geographyCheckbox.isSelected()) selectedSubjects.add("Geography");
 
-        List<String> subjects = new ArrayList<>();
-        if (mathCheckbox.isSelected()) subjects.add("Mathematics");
-        if (scienceCheckbox.isSelected()) subjects.add("Science");
-        if (englishCheckbox.isSelected()) subjects.add("English");
-        if (historyCheckbox.isSelected()) subjects.add("History");
-        if (geographyCheckbox.isSelected()) subjects.add("Geography");
-        if (economicsCheckbox.isSelected()) subjects.add("Economics");
-        if (physicsCheckbox.isSelected()) subjects.add("Physics");
-        if (chemistryCheckbox.isSelected()) subjects.add("Chemistry");
+        // Add custom subject if entered
+        String custom = customSubjectField.getText().trim();
+        if (!custom.isEmpty()) {
+            selectedSubjects.add(custom);
+        }
 
-        System.out.println("Subjects selected: " + subjects);
-
-        if (subjects.isEmpty()) {
+        // Validate at least one subject selected
+        if (selectedSubjects.isEmpty()) {
             JOptionPane.showMessageDialog(this,
-                    "Please select at least one subject!",
-                    "No Subjects Selected",
+                    "Please select at least one subject or enter a custom subject.",
+                    "No Subjects",
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
 
+        String subjectsStr = String.join(",", selectedSubjects);
+
         try {
             int dailyHours = (Integer) hoursSpinner.getValue();
-            System.out.println("Daily hours: " + dailyHours);
-
             java.util.Date selected = (java.util.Date) dateSpinner.getValue();
             LocalDate examDate = selected.toInstant()
-                    .atZone(java.time.ZoneId.systemDefault())
+                    .atZone(ZoneId.systemDefault())
                     .toLocalDate();
-            System.out.println("Exam date: " + examDate);
 
+            // Map difficulty from display to database enum
             String difficulty = (String) difficultyCombo.getSelectedItem();
-            System.out.println("Difficulty: " + difficulty);
+            String difficultyEnum;
+            if ("Easy".equals(difficulty)) {
+                difficultyEnum = "EASY";
+            } else if ("Medium".equals(difficulty)) {
+                difficultyEnum = "MODERATE";
+            } else {
+                difficultyEnum = "HARD";
+            }
 
+            // Validate future date
             if (examDate.isBefore(LocalDate.now())) {
                 JOptionPane.showMessageDialog(this,
                         "Exam date must be in the future!",
@@ -874,53 +1023,51 @@ public class NormalStudyPlannerFrame extends JFrame {
                 return;
             }
 
-            // Double-check user ID
+            // Ensure user ID is set (should already be, but double-check)
             if (user.getId() == 0) {
-                System.err.println("❌ User ID is 0! Fixing...");
                 UserDAO userDAO = new UserDAO();
                 User dbUser = userDAO.findByEmail(user.getEmail());
                 if (dbUser != null) {
                     user.setId(dbUser.getId());
-                    System.out.println("✅ Fixed user ID to: " + user.getId());
+                } else {
+                    JOptionPane.showMessageDialog(this,
+                            "User not found in database. Please log in again.",
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
                 }
             }
 
-            System.out.println("Calling planGenerator.generatePlan()...");
-            currentPlan = planGenerator.generatePlan(
+            // Create StudyPlan using the constructor that takes subjects (new)
+            StudyPlan plan = planGenerator.generatePlan(
                     user,
-                    String.join(",", subjects),
+                    subjectsStr,
                     examDate,
                     dailyHours,
-                    difficulty.toUpperCase()
+                    difficultyEnum
             );
 
-            System.out.println("Plan generated: " + (currentPlan != null ? "SUCCESS" : "FAILED"));
-
-            if (currentPlan != null) {
-                System.out.println("Plan ID: " + currentPlan.getId());
-                List<StudyTask> tasks = studyTaskDAO.findByGoalId(currentPlan.getId());
-                System.out.println("Tasks in DB: " + tasks.size());
-
+            if (plan != null) {
                 JOptionPane.showMessageDialog(this,
-                        "✅ Study plan generated successfully!\n" +
-                                subjects.size() + " subjects scheduled until " +
-                                examDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy")),
+                        "✅ Plan created successfully!\nNow you can add topics.",
                         "Success",
                         JOptionPane.INFORMATION_MESSAGE);
 
-                showPlanTable();
-                refreshDashboard();
+                // Open PlanManagementFrame for this plan
+                SwingUtilities.invokeLater(() -> {
+                    new PlanManagementFrame(user, plan).setVisible(true);
+                });
 
-                // Switch to dashboard to show tasks
+                // Optionally switch to dashboard
                 cardLayout.show(contentPanel, "DASHBOARD");
+                refreshDashboard();
             } else {
                 JOptionPane.showMessageDialog(this,
-                        "❌ Failed to generate plan. Please check database connection.",
+                        "❌ Failed to create plan. Check database connection.",
                         "Error",
                         JOptionPane.ERROR_MESSAGE);
             }
         } catch (Exception e) {
-            System.err.println("❌ Exception: " + e.getMessage());
             e.printStackTrace();
             JOptionPane.showMessageDialog(this,
                     "Error: " + e.getMessage(),
@@ -928,51 +1075,10 @@ public class NormalStudyPlannerFrame extends JFrame {
                     JOptionPane.ERROR_MESSAGE);
         }
     }
-
-    private void showPlanTable() {
-        if (currentPlan == null) {
-            JOptionPane.showMessageDialog(this,
-                    "No study plan found. Please generate one first.",
-                    "No Plan",
-                    JOptionPane.INFORMATION_MESSAGE);
-            return;
-        }
-
-        planTableModel.setRowCount(0);
-        List<StudyTask> tasks = studyTaskDAO.findByGoalId(currentPlan.getId());
-        DateTimeFormatter dayFormatter = DateTimeFormatter.ofPattern("EEEE");
-        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MMM dd");
-
-        System.out.println("Showing " + tasks.size() + " tasks in table");
-
-        for (StudyTask task : tasks) {
-            String dayOfWeek = task.getTaskDate().format(dayFormatter);
-            String dateStr = task.getTaskDate().format(dateFormatter);
-            String subject = task.getDescription().replace("Study ", "");
-
-            String status;
-            if ("COMPLETED".equals(task.getStatus())) {
-                status = "✅ Completed";
-            } else if ("MISSED".equals(task.getStatus())) {
-                status = "❌ Missed";
-            } else {
-                status = "⏳ Pending";
-            }
-
-            planTableModel.addRow(new Object[]{
-                    dayOfWeek + " (" + dateStr + ")",
-                    subject,
-                    "2.0h",
-                    status
-            });
-        }
-
-        // Auto-adjust column widths
-        for (int i = 0; i < planTable.getColumnCount(); i++) {
-            planTable.getColumnModel().getColumn(i).setPreferredWidth(
-                    i == 0 ? 200 : (i == 1 ? 150 : (i == 2 ? 80 : 120))
-            );
-        }
+    private void openPlanList() {
+        SwingUtilities.invokeLater(() -> {
+            new StudyPlanListFrame(user).setVisible(true);
+        });
     }
 
     private void setupEventListeners() {
@@ -997,7 +1103,6 @@ public class NormalStudyPlannerFrame extends JFrame {
             }
         });
 
-        // Add window listener to cleanup on close
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowClosing(java.awt.event.WindowEvent e) {
                 int confirm = JOptionPane.showConfirmDialog(
@@ -1029,7 +1134,7 @@ public class NormalStudyPlannerFrame extends JFrame {
         }
     }
 
-    // Custom cell renderer for task list with better styling
+    // Custom cell renderer for task list
     class TaskListCellRenderer extends DefaultListCellRenderer {
         @Override
         public Component getListCellRendererComponent(JList<?> list, Object value,
@@ -1039,17 +1144,16 @@ public class NormalStudyPlannerFrame extends JFrame {
 
             String text = value.toString();
             if (text.startsWith("✅")) {
-                setForeground(new Color(34, 197, 94)); // Success green
+                setForeground(SUCCESS_COLOR);
                 setFont(getFont().deriveFont(Font.BOLD));
             } else if (text.startsWith("🎉")) {
-                setForeground(new Color(79, 70, 229)); // Primary color
+                setForeground(PRIMARY_COLOR);
                 setFont(getFont().deriveFont(Font.ITALIC));
             } else if (text.startsWith("⬜")) {
-                setForeground(new Color(75, 85, 99)); // Dark gray
+                setForeground(TEXT_PRIMARY);
                 setFont(getFont().deriveFont(Font.PLAIN));
             }
 
-            // Add padding
             setBorder(new EmptyBorder(8, 10, 8, 10));
 
             return c;
@@ -1066,13 +1170,13 @@ public class NormalStudyPlannerFrame extends JFrame {
 
             String status = value.toString();
             if (status.contains("✅")) {
-                setForeground(new Color(34, 197, 94));
+                setForeground(SUCCESS_COLOR);
                 setFont(getFont().deriveFont(Font.BOLD));
             } else if (status.contains("❌")) {
-                setForeground(new Color(239, 68, 68));
+                setForeground(DANGER_COLOR);
                 setFont(getFont().deriveFont(Font.BOLD));
             } else {
-                setForeground(new Color(245, 158, 11));
+                setForeground(WARNING_COLOR);
                 setFont(getFont().deriveFont(Font.PLAIN));
             }
 
