@@ -105,6 +105,14 @@ public class NormalStudyPlannerFrame extends JFrame {
         }
     }
 
+    public void refreshDashboardFromPlans() {
+        // Find the DashboardFrame component (index 0 in contentPanel)
+        Component comp = contentPanel.getComponent(0);
+        if (comp instanceof DashboardFrame) {
+            ((DashboardFrame) comp).refreshDashboard();
+        }
+    }
+
     private void initUI() {
         setTitle("Smart Study Planner - Normal Student");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -1077,7 +1085,7 @@ public class NormalStudyPlannerFrame extends JFrame {
     }
     private void openPlanList() {
         SwingUtilities.invokeLater(() -> {
-            new StudyPlanListFrame(user).setVisible(true);
+            new StudyPlanListFrame(this, user).setVisible(true);   // <-- pass 'this'
         });
     }
 
@@ -1090,12 +1098,15 @@ public class NormalStudyPlannerFrame extends JFrame {
                     if (index >= 0) {
                         String taskStr = taskListModel.get(index);
                         if (!taskStr.startsWith("🎉")) {
-                            List<StudyTask> tasks = studyTaskDAO.findTodayTasks(user.getId());
-                            if (index < tasks.size()) {
-                                StudyTask task = tasks.get(index);
-                                String newStatus = "COMPLETED".equals(task.getStatus()) ? "PENDING" : "COMPLETED";
-                                studyTaskDAO.updateStatus(task.getId(), newStatus);
-                                refreshDashboard();
+                            Integer activePlanId = user.getActivePlanId();
+                            if (activePlanId != null) {
+                                List<StudyTask> tasks = studyTaskDAO.findTodayTasksByPlan(activePlanId);
+                                if (index < tasks.size()) {
+                                    StudyTask task = tasks.get(index);
+                                    String newStatus = "COMPLETED".equals(task.getStatus()) ? "PENDING" : "COMPLETED";
+                                    studyTaskDAO.updateStatus(task.getId(), newStatus);
+                                    refreshDashboard();
+                                }
                             }
                         }
                     }

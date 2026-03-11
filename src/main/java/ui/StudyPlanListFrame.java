@@ -15,6 +15,7 @@ import java.util.List;
 
 public class StudyPlanListFrame extends JFrame {
 
+    private NormalStudyPlannerFrame parentFrame;   // reference to main frame (ADD THIS)
     private User user;
     private StudyPlanDAO studyPlanDAO;
     private StudyTaskDAO studyTaskDAO;
@@ -28,7 +29,9 @@ public class StudyPlanListFrame extends JFrame {
     private final Color CARD_BG = Color.WHITE;
     private final Color BORDER_COLOR = new Color(229, 231, 235);
 
-    public StudyPlanListFrame(User user) {
+    // UPDATED CONSTRUCTOR – takes parent frame
+    public StudyPlanListFrame(NormalStudyPlannerFrame parent, User user) {
+        this.parentFrame = parent;   // store parent
         this.user = user;
         this.studyPlanDAO = new StudyPlanDAO();
         this.studyTaskDAO = new StudyTaskDAO();
@@ -219,7 +222,7 @@ public class StudyPlanListFrame extends JFrame {
         }
     }
 
-    // Editor for Activate/Deactivate button
+    // Editor for Activate/Deactivate button (UPDATED with refresh callback)
     class ActivateButtonEditor extends DefaultCellEditor {
         protected JButton button;
         private String label;
@@ -261,10 +264,18 @@ public class StudyPlanListFrame extends JFrame {
                     userDAO.updateActivePlan(user.getId(), null);
                     user.setActivePlanId(null);
                     JOptionPane.showMessageDialog(button, "Plan deactivated.");
+                    // --- ADD THIS CALLBACK ---
+                    if (parentFrame != null) {
+                        parentFrame.refreshDashboardFromPlans();
+                    }
                 } else {
                     userDAO.updateActivePlan(user.getId(), selectedPlanId);
                     user.setActivePlanId(selectedPlanId);
                     JOptionPane.showMessageDialog(button, "Plan " + selectedPlanId + " is now active.");
+                    // --- ADD THIS CALLBACK ---
+                    if (parentFrame != null) {
+                        parentFrame.refreshDashboardFromPlans();
+                    }
                 }
                 // Refresh table to update button texts
                 loadPlans();

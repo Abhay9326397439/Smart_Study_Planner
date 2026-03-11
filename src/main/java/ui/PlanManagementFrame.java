@@ -15,11 +15,14 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
+import java.util.ArrayList;
 
 public class PlanManagementFrame extends JFrame {
 
@@ -33,7 +36,7 @@ public class PlanManagementFrame extends JFrame {
 
     // UI Components
     private JLabel planIdLabel;
-    private JLabel subjectsLabel;          // Changed from subjectLabel to subjectsLabel
+    private JLabel subjectsLabel;
     private JSpinner dateSpinner;
     private JSpinner hoursSpinner;
     private JComboBox<String> difficultyCombo;
@@ -42,6 +45,9 @@ public class PlanManagementFrame extends JFrame {
     private JLabel statsLabel;
     private DefaultListModel<String> topicListModel;
     private JList<String> topicList;
+
+    // Store task IDs in the same order as table rows
+    private List<Integer> taskIdList;
 
     // Colors
     private final Color PRIMARY_COLOR = new Color(79, 70, 229);
@@ -59,6 +65,7 @@ public class PlanManagementFrame extends JFrame {
         this.topicDAO = new TopicDAO();
         this.planGenerator = new NormalPlanGenerator();
         this.weightCalculator = new TopicWeightCalculator();
+        this.taskIdList = new ArrayList<>();
 
         initUI();
         loadPlanData();
@@ -124,7 +131,7 @@ public class PlanManagementFrame extends JFrame {
         planIdLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
         panel.add(planIdLabel, gbc);
 
-        // Subjects (changed from Subject)
+        // Subjects
         gbc.gridx = 0; gbc.gridy = 1;
         panel.add(new JLabel("Subjects:"), gbc);
         gbc.gridx = 1;
@@ -242,6 +249,18 @@ public class PlanManagementFrame extends JFrame {
             tasksTable.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
         }
 
+        // Add double-click listener to toggle task status
+        tasksTable.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    int row = tasksTable.getSelectedRow();
+                    if (row >= 0 && row < taskIdList.size()) {
+                        toggleTaskStatus(row);
+                    }
+                }
+            }
+        });
+
         JScrollPane scrollPane = new JScrollPane(tasksTable);
         scrollPane.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
         scrollPane.setPreferredSize(new Dimension(400, 300));
@@ -303,7 +322,6 @@ public class PlanManagementFrame extends JFrame {
             return;
         }
         planIdLabel.setText(String.valueOf(plan.getId()));
-        // Show subjects if available, otherwise fallback to subjectName
         String displaySubjects = plan.getSubjects() != null ? plan.getSubjects().replace(",", ", ") : plan.getSubjectName();
         subjectsLabel.setText(displaySubjects != null ? displaySubjects : "N/A");
         dateSpinner.setValue(Date.from(plan.getDeadline().atStartOfDay(ZoneId.systemDefault()).toInstant()));
@@ -322,10 +340,12 @@ public class PlanManagementFrame extends JFrame {
 
     private void loadTasks() {
         tableModel.setRowCount(0);
+        taskIdList.clear();
         List<StudyTask> tasks = studyTaskDAO.findByGoalId(plan.getId());
         int completed = 0;
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("MMM dd");
         for (StudyTask task : tasks) {
+            taskIdList.add(task.getId());
             String status;
             if ("COMPLETED".equals(task.getStatus())) {
                 status = "✅ Completed";
@@ -346,15 +366,55 @@ public class PlanManagementFrame extends JFrame {
         statsLabel.setText(completed + "/" + total + " (" + progress + "%)");
     }
 
+    private void toggleTaskStatus(int row) {
+        int taskId = taskIdList.get(row);
+        // Get current status from database (or from table, but safer to refetch)
+        List<StudyTask> tasks = studyTaskDAO.findByGoalId(plan.getId());
+        StudyTask task = tasks.stream().filter(t -> t.getId() == taskId).findFirst().orElse(null);
+        if (task == null) return;
+
+        String newStatus = "COMPLETED".equals(task.getStatus()) ? "PENDING" : "COMPLETED";
+        studyTaskDAO.updateStatus(taskId, newStatus);
+
+        // Reload tasks to reflect change
+        loadTasks();
+
+        // Refresh any open DashboardFrame
+        refreshDashboardIfOpen();
+    }
+
+    // Helper to find and refresh any open DashboardFrame
+    private void refreshDashboardIfOpen() {
+        for (Window window : Window.getWindows()) {
+            if (window instanceof JFrame) {
+                JFrame frame = (JFrame) window;
+                // Check if the frame contains a DashboardFrame (it might be the content pane or a panel)
+                Component[] components = frame.getContentPane().getComponents();
+                for (Component comp : components) {
+                    if (comp instanceof DashboardFrame) {
+                        ((DashboardFrame) comp).refresh();
+                        return;
+                    } else if (comp instanceof JPanel) {
+                        // Recursively search panels (simplified: just one level)
+                        for (Component sub : ((JPanel) comp).getComponents()) {
+                            if (sub instanceof DashboardFrame) {
+                                ((DashboardFrame) sub).refresh();
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private void openAddTopicDialog() {
-        // Get subjects list from plan
         String subjectsStr = plan.getSubjects();
         if (subjectsStr == null || subjectsStr.isEmpty()) {
             JOptionPane.showMessageDialog(this, "No subjects defined for this plan.", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
         String[] subjectsArray = subjectsStr.split(",");
-        // Trim each subject
         for (int i = 0; i < subjectsArray.length; i++) {
             subjectsArray[i] = subjectsArray[i].trim();
         }
@@ -367,7 +427,6 @@ public class PlanManagementFrame extends JFrame {
     }
 
     private void generateTasks() {
-        // Delete existing tasks and regenerate based on topics
         List<Topic> topics = topicDAO.findByPlanId(plan.getId());
         if (topics.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Please add topics first.", "No Topics", JOptionPane.WARNING_MESSAGE);
@@ -379,15 +438,13 @@ public class PlanManagementFrame extends JFrame {
                 "Confirm", JOptionPane.YES_NO_OPTION);
         if (confirm != JOptionPane.YES_OPTION) return;
 
-        // Delete old tasks
         studyTaskDAO.deleteByGoalId(plan.getId());
-
-        // Generate new tasks
         List<StudyTask> newTasks = planGenerator.generateTasksFromTopics(plan);
         studyTaskDAO.saveAll(newTasks);
 
         JOptionPane.showMessageDialog(this, "Tasks generated successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
         loadTasks();
+        refreshDashboardIfOpen();
     }
 
     private void updatePlan() {
@@ -396,7 +453,6 @@ public class PlanManagementFrame extends JFrame {
             LocalDate newDeadline = selected.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
             int newHours = (Integer) hoursSpinner.getValue();
 
-            // Map difficulty from display value to database enum
             String selectedDifficulty = (String) difficultyCombo.getSelectedItem();
             String difficultyEnum;
             if ("Easy".equals(selectedDifficulty)) {
@@ -415,12 +471,10 @@ public class PlanManagementFrame extends JFrame {
                 return;
             }
 
-            // Update the plan object
             plan.setDeadline(newDeadline);
             plan.setDailyHours(newHours);
             plan.setDifficulty(difficultyEnum);
 
-            // Save to database
             studyPlanDAO.update(plan);
 
             JOptionPane.showMessageDialog(this,
@@ -428,7 +482,6 @@ public class PlanManagementFrame extends JFrame {
                     "Success",
                     JOptionPane.INFORMATION_MESSAGE);
 
-            // Reload data to reflect changes
             loadPlanData();
         } catch (Exception e) {
             e.printStackTrace();
@@ -444,7 +497,6 @@ public class PlanManagementFrame extends JFrame {
                 "Are you sure you want to delete this plan? All topics and tasks will be lost.",
                 "Confirm Delete", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
         if (confirm == JOptionPane.YES_OPTION) {
-            // Delete tasks and topics (cascade should handle, but explicit is safe)
             studyTaskDAO.deleteByGoalId(plan.getId());
             topicDAO.deleteByPlanId(plan.getId());
             studyPlanDAO.deleteById(plan.getId());

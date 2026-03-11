@@ -2,6 +2,7 @@ package ui;
 
 import dao.StudyPlanDAO;
 import dao.StudyTaskDAO;
+import dao.UserDAO;               // <-- added import
 import model.User;
 import model.StudyPlan;
 import model.StudyTask;
@@ -343,6 +344,16 @@ public class DashboardFrame extends JPanel {
     public void refreshDashboard() {
         System.out.println("\n=== REFRESHING DASHBOARD ===");
 
+        // ------------------------------------------------------------
+        // NEW: Ensure we have the latest active plan from the database
+        // ------------------------------------------------------------
+        UserDAO userDAO = new UserDAO();
+        User latestUser = userDAO.findById(user.getId());
+        if (latestUser != null) {
+            // Update the current user object with the latest active plan
+            user.setActivePlanId(latestUser.getActivePlanId());
+        }
+
         Integer activePlanId = user.getActivePlanId();
 
         if (activePlanId == null) {
@@ -370,14 +381,13 @@ public class DashboardFrame extends JPanel {
                 .filter(t -> "COMPLETED".equals(t.getStatus())).count();
         int overallProgress = totalPlanTasks > 0 ? (completedPlanTasks * 100 / totalPlanTasks) : 0;
 
-        // Update overall stats
+        // Update overall stats (these are the lower layer cards)
         overallTotalLabel.setText(String.valueOf(totalPlanTasks));
         overallCompletedLabel.setText(String.valueOf(completedPlanTasks));
         overallProgressBar.setValue(overallProgress);
         overallProgressBar.setString(overallProgress + "% (" + completedPlanTasks + "/" + totalPlanTasks + ")");
 
-        // Get today's tasks for active plan (need a method that filters by plan and date)
-        // We'll reuse findTodayTasks but modify it to accept planId. For now, we'll filter manually.
+        // Get today's tasks for active plan
         LocalDate today = LocalDate.now();
         List<StudyTask> todayTasks = allPlanTasks.stream()
                 .filter(t -> t.getTaskDate().equals(today))
@@ -405,6 +415,11 @@ public class DashboardFrame extends JPanel {
 
         revalidate();
         repaint();
+    }
+
+    // Public method to allow external refresh (e.g., from PlanManagementFrame)
+    public void refresh() {
+        refreshDashboard();
     }
 
     // Custom cell renderer for task list
