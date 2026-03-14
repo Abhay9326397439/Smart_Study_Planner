@@ -110,6 +110,9 @@ public class StudyPlanListFrame extends JFrame {
             int completed = (int) tasks.stream().filter(t -> "COMPLETED".equals(t.getStatus())).count();
             int progress = total > 0 ? (completed * 100 / total) : 0;
 
+            // Debug line to verify each plan's task counts
+            System.out.println("Plan " + plan.getId() + ": " + completed + "/" + total + " tasks");
+
             String subjectDisplay = plan.getSubjects() != null ? plan.getSubjects().replace(",", ", ") : plan.getSubjectName();
             if (subjectDisplay == null) subjectDisplay = "N/A";
 

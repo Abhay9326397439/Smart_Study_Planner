@@ -49,6 +49,7 @@ public class StudyTaskDAO {
         System.out.println("All tasks saved successfully");
     }
 
+    // ✅ PLAN-SPECIFIC METHOD - KEEP
     public List<StudyTask> findByGoalId(int goalId) {
         List<StudyTask> tasks = new ArrayList<>();
         String sql = "SELECT * FROM study_tasks WHERE goal_id = ? ORDER BY task_date ASC";
@@ -72,34 +73,7 @@ public class StudyTaskDAO {
         return tasks;
     }
 
-    public List<StudyTask> findTodayTasks(int userId) {
-        List<StudyTask> tasks = new ArrayList<>();
-        String sql =
-                "SELECT t.* FROM study_tasks t " +
-                        "JOIN goals g ON t.goal_id = g.id " +
-                        "WHERE g.user_id = ? AND t.task_date = CURRENT_DATE " +
-                        "ORDER BY t.id ASC";
-
-        try (Connection conn = DBConnection.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setInt(1, userId);
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                tasks.add(mapResultSetToStudyTask(rs));
-            }
-
-            System.out.println("Found " + tasks.size() + " tasks for today for user ID: " + userId);
-        } catch (SQLException e) {
-            System.err.println("Database error in StudyTaskDAO.findTodayTasks: " + e.getMessage());
-            e.printStackTrace();
-        }
-
-        return tasks;
-    }
-
-    // ✅ NEW: Find today's tasks for a specific plan
+    // ✅ PLAN-SPECIFIC METHOD - KEEP
     public List<StudyTask> findTodayTasksByPlan(int planId) {
         List<StudyTask> tasks = new ArrayList<>();
         String sql = "SELECT * FROM study_tasks WHERE goal_id = ? AND task_date = CURRENT_DATE ORDER BY id";
@@ -123,61 +97,59 @@ public class StudyTaskDAO {
         return tasks;
     }
 
-    public List<StudyTask> findAllTasksByUser(int userId) {
-        List<StudyTask> tasks = new ArrayList<>();
-        String sql =
-                "SELECT t.* FROM study_tasks t " +
-                        "JOIN goals g ON t.goal_id = g.id " +
-                        "WHERE g.user_id = ? " +
-                        "ORDER BY t.task_date DESC";
+    // ✅ PLAN-SPECIFIC METHOD - KEEP
+    public int getTotalTaskCountByPlan(int planId) {
+        String sql = "SELECT COUNT(*) FROM study_tasks WHERE goal_id = ?";
+        try (Connection conn = DBConnection.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, planId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            System.err.println("Database error in StudyTaskDAO.getTotalTaskCountByPlan: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    // ✅ PLAN-SPECIFIC METHOD - KEEP
+    public int getCompletedTaskCountByPlan(int planId) {
+        String sql = "SELECT COUNT(*) FROM study_tasks WHERE goal_id = ? AND status = 'COMPLETED'";
+        try (Connection conn = DBConnection.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, planId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            System.err.println("Database error in StudyTaskDAO.getCompletedTaskCountByPlan: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    // ✅ KEEP - Used for deleting tasks
+    public void deleteByGoalId(int goalId) {
+        String sql = "DELETE FROM study_tasks WHERE goal_id = ?";
 
         try (Connection conn = DBConnection.getInstance().getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setInt(1, userId);
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                tasks.add(mapResultSetToStudyTask(rs));
-            }
-
-            System.out.println("Found " + tasks.size() + " total tasks for user ID: " + userId);
+            stmt.setInt(1, goalId);
+            int affectedRows = stmt.executeUpdate();
+            System.out.println("Deleted " + affectedRows + " tasks for goal ID: " + goalId);
         } catch (SQLException e) {
-            System.err.println("Database error in StudyTaskDAO.findAllTasksByUser: " + e.getMessage());
+            System.err.println("Database error in StudyTaskDAO.deleteByGoalId: " + e.getMessage());
             e.printStackTrace();
         }
-
-        return tasks;
     }
 
-    public List<StudyTask> findTasksByDate(int userId, LocalDate date) {
-        List<StudyTask> tasks = new ArrayList<>();
-        String sql =
-                "SELECT t.* FROM study_tasks t " +
-                        "JOIN goals g ON t.goal_id = g.id " +
-                        "WHERE g.user_id = ? AND t.task_date = ? " +
-                        "ORDER BY t.id ASC";
-
-        try (Connection conn = DBConnection.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setInt(1, userId);
-            stmt.setDate(2, Date.valueOf(date));
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                tasks.add(mapResultSetToStudyTask(rs));
-            }
-
-            System.out.println("Found " + tasks.size() + " tasks for date " + date + " for user ID: " + userId);
-        } catch (SQLException e) {
-            System.err.println("Database error in StudyTaskDAO.findTasksByDate: " + e.getMessage());
-            e.printStackTrace();
-        }
-
-        return tasks;
-    }
-
+    // ✅ KEEP - Used for toggling task completion
     public void updateStatus(int taskId, String status) {
         String sql = "UPDATE study_tasks SET status = ? WHERE id = ?";
 
@@ -207,96 +179,12 @@ public class StudyTaskDAO {
         }
     }
 
-    // ✅ NEW: Get total task count for a specific plan
-    public int getTotalTaskCountByPlan(int planId) {
-        String sql = "SELECT COUNT(*) FROM study_tasks WHERE goal_id = ?";
-        try (Connection conn = DBConnection.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setInt(1, planId);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            System.err.println("Database error in StudyTaskDAO.getTotalTaskCountByPlan: " + e.getMessage());
-            e.printStackTrace();
-        }
-        return 0;
-    }
-
-    // ✅ NEW: Get completed task count for a specific plan
-    public int getCompletedTaskCountByPlan(int planId) {
-        String sql = "SELECT COUNT(*) FROM study_tasks WHERE goal_id = ? AND status = 'COMPLETED'";
-        try (Connection conn = DBConnection.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setInt(1, planId);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            System.err.println("Database error in StudyTaskDAO.getCompletedTaskCountByPlan: " + e.getMessage());
-            e.printStackTrace();
-        }
-        return 0;
-    }
-
-    public int getCompletedTaskCount(int userId) {
-        String sql =
-                "SELECT COUNT(*) FROM study_tasks t " +
-                        "JOIN goals g ON t.goal_id = g.id " +
-                        "WHERE g.user_id = ? AND t.status = 'COMPLETED'";
-
-        try (Connection conn = DBConnection.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setInt(1, userId);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
-    }
-
-    public int getTotalTaskCount(int userId) {
-        String sql =
-                "SELECT COUNT(*) FROM study_tasks t " +
-                        "JOIN goals g ON t.goal_id = g.id " +
-                        "WHERE g.user_id = ?";
-
-        try (Connection conn = DBConnection.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setInt(1, userId);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
-    }
-
-    public void deleteByGoalId(int goalId) {
-        String sql = "DELETE FROM study_tasks WHERE goal_id = ?";
-
-        try (Connection conn = DBConnection.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setInt(1, goalId);
-            int affectedRows = stmt.executeUpdate();
-            System.out.println("Deleted " + affectedRows + " tasks for goal ID: " + goalId);
-        } catch (SQLException e) {
-            System.err.println("Database error in StudyTaskDAO.deleteByGoalId: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
+    // ❌ REMOVED - Global methods that combined data across plans
+    // public List<StudyTask> findTodayTasks(int userId) - REMOVED
+    // public List<StudyTask> findAllTasksByUser(int userId) - REMOVED
+    // public int getTotalTaskCount(int userId) - REMOVED
+    // public int getCompletedTaskCount(int userId) - REMOVED
+    // public List<StudyTask> findTasksByDate(int userId, LocalDate date) - REMOVED
 
     private StudyTask mapResultSetToStudyTask(ResultSet rs) throws SQLException {
         StudyTask task = new StudyTask();

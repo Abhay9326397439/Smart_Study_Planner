@@ -29,7 +29,8 @@ public class NormalStudyPlannerFrame extends JFrame {
     private JPanel contentPanel;
     private CardLayout cardLayout;
 
-    // Dashboard components
+    // Dashboard components - Now all handled by DashboardFrame
+    // These are kept for reference but not used
     private JLabel welcomeLabel;
     private JLabel dateLabel;
     private JLabel totalTasksLabel;
@@ -106,7 +107,6 @@ public class NormalStudyPlannerFrame extends JFrame {
     }
 
     public void refreshDashboardFromPlans() {
-        // Find the DashboardFrame component (index 0 in contentPanel)
         Component comp = contentPanel.getComponent(0);
         if (comp instanceof DashboardFrame) {
             ((DashboardFrame) comp).refreshDashboard();
@@ -136,7 +136,7 @@ public class NormalStudyPlannerFrame extends JFrame {
         contentPanel.setBackground(Color.WHITE);
         contentPanel.setBorder(new EmptyBorder(25, 30, 25, 30));
 
-        contentPanel.add(createDashboardPanel(), "DASHBOARD");
+        contentPanel.add(new DashboardFrame(user), "DASHBOARD");
         contentPanel.add(createStudyPlanPanel(), "STUDY_PLAN");
         contentPanel.add(createProfilePanel(), "PROFILE");
         contentPanel.add(createAboutPanel(), "ABOUT");
@@ -256,265 +256,17 @@ public class NormalStudyPlannerFrame extends JFrame {
             button.setForeground(PRIMARY_COLOR);
             button.setBackground(new Color(55, 65, 81));
 
-            if (cardName.equals("DASHBOARD")) refreshDashboard();
-            else if (cardName.equals("STUDY_PLAN")) refreshStudyPlan();
-            else if (cardName.equals("PROFILE")) refreshProfile();
+            if (cardName.equals("DASHBOARD")) {
+                // Dashboard refresh is handled by DashboardFrame
+                Component comp = contentPanel.getComponent(0);
+                if (comp instanceof DashboardFrame) {
+                    ((DashboardFrame) comp).refreshDashboard();
+                }
+            }
         });
 
         sidebarPanel.add(button);
         sidebarPanel.add(Box.createVerticalStrut(8));
-    }
-
-    private JPanel createDashboardPanel() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(Color.WHITE);
-
-        // Main content panel that will be scrollable
-        JPanel contentPanel = new JPanel();
-        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
-        contentPanel.setBackground(Color.WHITE);
-
-        // Welcome Header
-        JPanel headerPanel = new JPanel(new BorderLayout());
-        headerPanel.setBackground(Color.WHITE);
-        headerPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 100));
-        headerPanel.setBorder(new EmptyBorder(20, 20, 10, 20));
-
-        JLabel headerTitle = new JLabel("Dashboard");
-        headerTitle.setFont(new Font("Segoe UI", Font.BOLD, 28));
-        headerTitle.setForeground(TEXT_PRIMARY);
-
-        welcomeLabel = new JLabel("Welcome back, " + user.getName() + "!");
-        welcomeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-        welcomeLabel.setForeground(TEXT_SECONDARY);
-
-        dateLabel = new JLabel(LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy")));
-        dateLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        dateLabel.setForeground(TEXT_SECONDARY);
-
-        JPanel titlePanel = new JPanel(new BorderLayout());
-        titlePanel.setBackground(Color.WHITE);
-        titlePanel.add(headerTitle, BorderLayout.NORTH);
-        titlePanel.add(welcomeLabel, BorderLayout.SOUTH);
-
-        headerPanel.add(titlePanel, BorderLayout.WEST);
-        headerPanel.add(dateLabel, BorderLayout.EAST);
-
-        contentPanel.add(headerPanel);
-        contentPanel.add(Box.createVerticalStrut(10));
-
-        // Stats Cards Grid
-        JPanel statsGrid = new JPanel(new GridLayout(1, 3, 20, 0));
-        statsGrid.setBackground(Color.WHITE);
-        statsGrid.setMaximumSize(new Dimension(Integer.MAX_VALUE, 150));
-        statsGrid.setBorder(new EmptyBorder(0, 20, 0, 20));
-
-        statsGrid.add(createStatsCard("📋", "Total Tasks", "0"));
-        statsGrid.add(createStatsCard("✅", "Completed", "0"));
-        statsGrid.add(createStatsCard("📊", "Progress", "0%"));
-
-        contentPanel.add(statsGrid);
-        contentPanel.add(Box.createVerticalStrut(20));
-
-        // Daily Progress Card
-        JPanel progressCard = new JPanel(new BorderLayout());
-        progressCard.setBackground(CARD_BG);
-        progressCard.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
-                new EmptyBorder(20, 20, 20, 20)
-        ));
-        progressCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200));
-
-        JLabel progressTitle = new JLabel("Daily Progress");
-        progressTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        progressTitle.setForeground(TEXT_PRIMARY);
-
-        progressPercentageLabel = new JLabel("0%");
-        progressPercentageLabel.setFont(new Font("Segoe UI", Font.BOLD, 48));
-        progressPercentageLabel.setForeground(PRIMARY_COLOR);
-        progressPercentageLabel.setHorizontalAlignment(SwingConstants.CENTER);
-
-        dailyProgressBar = new JProgressBar(0, 100);
-        dailyProgressBar.setStringPainted(true);
-        dailyProgressBar.setForeground(PRIMARY_COLOR);
-        dailyProgressBar.setBackground(new Color(224, 231, 255));
-        dailyProgressBar.setBorderPainted(false);
-        dailyProgressBar.setPreferredSize(new Dimension(200, 25));
-
-        JPanel progressContent = new JPanel(new BorderLayout(0, 15));
-        progressContent.setBackground(CARD_BG);
-        progressContent.add(progressPercentageLabel, BorderLayout.NORTH);
-        progressContent.add(dailyProgressBar, BorderLayout.CENTER);
-
-        progressCard.add(progressTitle, BorderLayout.NORTH);
-        progressCard.add(progressContent, BorderLayout.CENTER);
-
-        contentPanel.add(progressCard);
-        contentPanel.add(Box.createVerticalStrut(20));
-
-        // Today's Tasks Card
-        JPanel tasksCard = new JPanel(new BorderLayout());
-        tasksCard.setBackground(CARD_BG);
-        tasksCard.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
-                new EmptyBorder(20, 20, 20, 20)
-        ));
-        tasksCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 300));
-
-        JPanel tasksHeader = new JPanel(new BorderLayout());
-        tasksHeader.setBackground(CARD_BG);
-
-        JLabel tasksTitle = new JLabel("Today's Tasks");
-        tasksTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        tasksTitle.setForeground(TEXT_PRIMARY);
-
-        totalTasksLabel = new JLabel("0 tasks");
-        totalTasksLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        totalTasksLabel.setForeground(TEXT_SECONDARY);
-
-        tasksHeader.add(tasksTitle, BorderLayout.WEST);
-        tasksHeader.add(totalTasksLabel, BorderLayout.EAST);
-
-        taskListModel = new DefaultListModel<>();
-        taskList = new JList<>(taskListModel);
-        taskList.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        taskList.setBackground(CARD_BG);
-        taskList.setSelectionBackground(new Color(224, 231, 255));
-        taskList.setBorder(new EmptyBorder(10, 0, 0, 0));
-        taskList.setCellRenderer(new TaskListCellRenderer());
-
-        JScrollPane taskScroll = new JScrollPane(taskList);
-        taskScroll.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
-        taskScroll.setPreferredSize(new Dimension(300, 200));
-
-        tasksCard.add(tasksHeader, BorderLayout.NORTH);
-        tasksCard.add(taskScroll, BorderLayout.CENTER);
-
-        contentPanel.add(tasksCard);
-        contentPanel.add(Box.createVerticalStrut(20));
-
-        // Overall Progress Card
-        JPanel overallCard = new JPanel(new BorderLayout());
-        overallCard.setBackground(CARD_BG);
-        overallCard.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
-                new EmptyBorder(20, 20, 20, 20)
-        ));
-        overallCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 150));
-
-        JLabel overallTitle = new JLabel("Overall Progress");
-        overallTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        overallTitle.setForeground(TEXT_PRIMARY);
-
-        int totalTasks = studyTaskDAO.getTotalTaskCount(user.getId());
-        int completedTasks = studyTaskDAO.getCompletedTaskCount(user.getId());
-        int overallProgress = totalTasks > 0 ? (completedTasks * 100 / totalTasks) : 0;
-
-        JPanel overallStatsPanel = new JPanel(new GridLayout(1, 2, 20, 0));
-        overallStatsPanel.setBackground(CARD_BG);
-
-        JPanel completedPanel = new JPanel();
-        completedPanel.setLayout(new BoxLayout(completedPanel, BoxLayout.Y_AXIS));
-        completedPanel.setBackground(CARD_BG);
-
-        JLabel completedValue = new JLabel(String.valueOf(completedTasks));
-        completedValue.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        completedValue.setForeground(SUCCESS_COLOR);
-        completedValue.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        JLabel completedLabel = new JLabel("Completed");
-        completedLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        completedLabel.setForeground(TEXT_SECONDARY);
-        completedLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        completedPanel.add(completedValue);
-        completedPanel.add(completedLabel);
-
-        JPanel totalPanel = new JPanel();
-        totalPanel.setLayout(new BoxLayout(totalPanel, BoxLayout.Y_AXIS));
-        totalPanel.setBackground(CARD_BG);
-
-        JLabel totalValue = new JLabel(String.valueOf(totalTasks));
-        totalValue.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        totalValue.setForeground(PRIMARY_COLOR);
-        totalValue.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        JLabel totalLabel = new JLabel("Total Tasks");
-        totalLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        totalLabel.setForeground(TEXT_SECONDARY);
-        totalLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        totalPanel.add(totalValue);
-        totalPanel.add(totalLabel);
-
-        overallStatsPanel.add(completedPanel);
-        overallStatsPanel.add(totalPanel);
-
-        JProgressBar overallProgressBar = new JProgressBar(0, 100);
-        overallProgressBar.setValue(overallProgress);
-        overallProgressBar.setStringPainted(true);
-        overallProgressBar.setForeground(PRIMARY_COLOR);
-        overallProgressBar.setBackground(new Color(224, 231, 255));
-        overallProgressBar.setBorderPainted(false);
-        overallProgressBar.setPreferredSize(new Dimension(200, 20));
-
-        overallCard.add(overallTitle, BorderLayout.NORTH);
-        overallCard.add(overallStatsPanel, BorderLayout.CENTER);
-        overallCard.add(overallProgressBar, BorderLayout.SOUTH);
-
-        contentPanel.add(overallCard);
-        contentPanel.add(Box.createVerticalStrut(50)); // Extra space at bottom
-
-        // Add to scroll pane
-        JScrollPane mainScrollPane = new JScrollPane(contentPanel);
-        mainScrollPane.setBorder(null);
-        mainScrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        mainScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-
-        panel.add(mainScrollPane, BorderLayout.CENTER);
-
-        return panel;
-    }
-
-    private JPanel createStatsCard(String icon, String label, String value) {
-        JPanel card = new JPanel(new BorderLayout(10, 0));
-        card.setBackground(CARD_BG);
-        card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
-                new EmptyBorder(20, 20, 20, 20)
-        ));
-
-        JLabel iconLabel = new JLabel(icon);
-        iconLabel.setFont(new Font("Segoe UI", Font.PLAIN, 36));
-
-        JPanel textPanel = new JPanel();
-        textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
-        textPanel.setBackground(CARD_BG);
-
-        JLabel valueLabel = new JLabel(value);
-        valueLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        valueLabel.setForeground(PRIMARY_COLOR);
-
-        JLabel labelLabel = new JLabel(label);
-        labelLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        labelLabel.setForeground(TEXT_SECONDARY);
-
-        textPanel.add(valueLabel);
-        textPanel.add(Box.createVerticalStrut(5));
-        textPanel.add(labelLabel);
-
-        if (label.equals("Total Tasks")) {
-            totalTasksLabel = valueLabel;
-        } else if (label.equals("Completed")) {
-            completedTasksLabel = valueLabel;
-        } else if (label.equals("Progress")) {
-            progressPercentageLabel = valueLabel;
-        }
-
-        card.add(iconLabel, BorderLayout.WEST);
-        card.add(textPanel, BorderLayout.CENTER);
-
-        return card;
     }
 
     private JPanel createStudyPlanPanel() {
@@ -547,7 +299,7 @@ public class NormalStudyPlannerFrame extends JFrame {
         topSection.add(leftPanel);
         topSection.add(rightPanel);
 
-        // Bottom section - Plan table (optional)
+        // Bottom section - Plan table
         JPanel tablePanel = createPlanTablePanel();
 
         contentPanel.add(topSection);
@@ -868,14 +620,6 @@ public class NormalStudyPlannerFrame extends JFrame {
         return panel;
     }
 
-    private JCheckBox createStyledCheckbox(String text, boolean selected) {
-        JCheckBox checkBox = new JCheckBox(text, selected);
-        checkBox.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        checkBox.setBackground(CARD_BG);
-        checkBox.setForeground(TEXT_PRIMARY);
-        return checkBox;
-    }
-
     private JLabel createStyledLabel(String text) {
         JLabel label = new JLabel(text);
         label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
@@ -899,64 +643,16 @@ public class NormalStudyPlannerFrame extends JFrame {
         List<StudyPlan> plans = studyPlanDAO.findByUserId(user.getId());
         if (!plans.isEmpty()) {
             currentPlan = plans.get(0);
-            // Also set active plan if needed (maybe from user.getActivePlanId())
-            refreshDashboard();
         }
     }
 
     private void refreshDashboard() {
-        System.out.println("\n=== REFRESHING DASHBOARD ===");
-
-        // If user has an active plan, get tasks for that plan
-        Integer activePlanId = user.getActivePlanId();
-        List<StudyTask> todayTasks;
-        int totalTasksOverall, completedTasksOverall;
-        if (activePlanId != null) {
-            // Get tasks for active plan only
-            todayTasks = studyTaskDAO.findTodayTasksByPlan(activePlanId); // need new method
-            totalTasksOverall = studyTaskDAO.getTotalTaskCountByPlan(activePlanId);
-            completedTasksOverall = studyTaskDAO.getCompletedTaskCountByPlan(activePlanId);
-        } else {
-            // Fallback to all tasks (legacy)
-            todayTasks = studyTaskDAO.findTodayTasks(user.getId());
-            totalTasksOverall = studyTaskDAO.getTotalTaskCount(user.getId());
-            completedTasksOverall = studyTaskDAO.getCompletedTaskCount(user.getId());
-        }
-
-        int totalToday = todayTasks.size();
-        int completedToday = (int) todayTasks.stream()
-                .filter(t -> "COMPLETED".equals(t.getStatus())).count();
-
-        System.out.println("Today's tasks: " + totalToday + ", Completed: " + completedToday);
-
-        totalTasksLabel.setText(String.valueOf(totalToday));
-        completedTasksLabel.setText(String.valueOf(completedToday));
-
-        int progress = totalToday > 0 ? (completedToday * 100 / totalToday) : 0;
-        dailyProgressBar.setValue(progress);
-        progressPercentageLabel.setText(progress + "%");
-        dailyProgressBar.setString(progress + "% (" + completedToday + "/" + totalToday + ")");
-
-        taskListModel.clear();
-        for (StudyTask task : todayTasks) {
-            String status = "COMPLETED".equals(task.getStatus()) ? "✅ " : "⬜ ";
-            taskListModel.addElement(status + task.getDescription());
-            System.out.println("  Task: " + task.getDescription() + " - " + task.getStatus());
-        }
-        if (todayTasks.isEmpty()) {
-            taskListModel.addElement("🎉 No tasks for today! Check your study plan.");
-        }
-
-        // Update overall progress card (optional)
-        // We could show overall progress of active plan in a separate card.
-
-        revalidate();
-        repaint();
+        // Dashboard is handled by DashboardFrame
+        System.out.println("Dashboard refresh triggered");
     }
 
     private void refreshStudyPlan() {
         System.out.println("\n=== REFRESHING STUDY PLAN ===");
-        // Optionally refresh the plan table, but we now open separate windows.
     }
 
     private void refreshProfile() {
@@ -1031,7 +727,7 @@ public class NormalStudyPlannerFrame extends JFrame {
                 return;
             }
 
-            // Ensure user ID is set (should already be, but double-check)
+            // Ensure user ID is set
             if (user.getId() == 0) {
                 UserDAO userDAO = new UserDAO();
                 User dbUser = userDAO.findByEmail(user.getEmail());
@@ -1046,7 +742,7 @@ public class NormalStudyPlannerFrame extends JFrame {
                 }
             }
 
-            // Create StudyPlan using the constructor that takes subjects (new)
+            // Create StudyPlan using the constructor that takes subjects
             StudyPlan plan = planGenerator.generatePlan(
                     user,
                     subjectsStr,
@@ -1083,36 +779,16 @@ public class NormalStudyPlannerFrame extends JFrame {
                     JOptionPane.ERROR_MESSAGE);
         }
     }
+
     private void openPlanList() {
         SwingUtilities.invokeLater(() -> {
-            new StudyPlanListFrame(this, user).setVisible(true);   // <-- pass 'this'
+            new StudyPlanListFrame(this, user).setVisible(true);
         });
     }
 
     private void setupEventListeners() {
-        // Double-click on task to toggle completion
-        taskList.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                if (evt.getClickCount() == 2) {
-                    int index = taskList.locationToIndex(evt.getPoint());
-                    if (index >= 0) {
-                        String taskStr = taskListModel.get(index);
-                        if (!taskStr.startsWith("🎉")) {
-                            Integer activePlanId = user.getActivePlanId();
-                            if (activePlanId != null) {
-                                List<StudyTask> tasks = studyTaskDAO.findTodayTasksByPlan(activePlanId);
-                                if (index < tasks.size()) {
-                                    StudyTask task = tasks.get(index);
-                                    String newStatus = "COMPLETED".equals(task.getStatus()) ? "PENDING" : "COMPLETED";
-                                    studyTaskDAO.updateStatus(task.getId(), newStatus);
-                                    refreshDashboard();
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        });
+        // Task list mouse listener is now handled by DashboardFrame
+        // Removed to avoid NullPointerException
 
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowClosing(java.awt.event.WindowEvent e) {
@@ -1145,7 +821,7 @@ public class NormalStudyPlannerFrame extends JFrame {
         }
     }
 
-    // Custom cell renderer for task list
+    // Custom cell renderer for task list - kept for reference but not used
     class TaskListCellRenderer extends DefaultListCellRenderer {
         @Override
         public Component getListCellRendererComponent(JList<?> list, Object value,
