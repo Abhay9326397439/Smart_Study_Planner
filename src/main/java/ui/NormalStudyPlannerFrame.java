@@ -30,15 +30,8 @@ public class NormalStudyPlannerFrame extends JFrame {
     private CardLayout cardLayout;
 
     // Dashboard components - Now all handled by DashboardFrame
-    // These are kept for reference but not used
     private JLabel welcomeLabel;
     private JLabel dateLabel;
-    private JLabel totalTasksLabel;
-    private JLabel completedTasksLabel;
-    private JLabel progressPercentageLabel;
-    private JProgressBar dailyProgressBar;
-    private DefaultListModel<String> taskListModel;
-    private JList<String> taskList;
 
     // Plan generation components (subjects)
     private JCheckBox marathiCheckbox, hindiCheckbox, englishCheckbox, physicsCheckbox;
@@ -47,8 +40,11 @@ public class NormalStudyPlannerFrame extends JFrame {
     private JSpinner hoursSpinner;
     private JSpinner dateSpinner;
     private JComboBox<String> difficultyCombo;
-    private JTable planTable;
-    private DefaultTableModel planTableModel;
+
+    // Today's Tasks components (in Study Plan panel)
+    private DefaultListModel<String> taskListModel;
+    private JList<String> taskList;
+    private JPanel tasksCard;
 
     // Profile components
     private JLabel profileNameLabel;
@@ -262,6 +258,10 @@ public class NormalStudyPlannerFrame extends JFrame {
                 if (comp instanceof DashboardFrame) {
                     ((DashboardFrame) comp).refreshDashboard();
                 }
+            } else if (cardName.equals("STUDY_PLAN")) {
+                refreshStudyPlan(); // Refresh tasks when switching to Study Plan tab
+            } else if (cardName.equals("PROFILE")) {
+                refreshProfile();
             }
         });
 
@@ -299,12 +299,12 @@ public class NormalStudyPlannerFrame extends JFrame {
         topSection.add(leftPanel);
         topSection.add(rightPanel);
 
-        // Bottom section - Plan table
-        JPanel tablePanel = createPlanTablePanel();
-
         contentPanel.add(topSection);
         contentPanel.add(Box.createVerticalStrut(25));
-        contentPanel.add(tablePanel);
+
+        // TODAY'S TASKS SECTION (moved from Dashboard)
+        tasksCard = createTodayTasksPanel();
+        contentPanel.add(tasksCard);
         contentPanel.add(Box.createVerticalStrut(25));
 
         // Add to scroll pane
@@ -317,6 +317,65 @@ public class NormalStudyPlannerFrame extends JFrame {
         panel.add(contentWrapper, BorderLayout.CENTER);
 
         return panel;
+    }
+
+    private JPanel createTodayTasksPanel() {
+        JPanel card = new JPanel(new BorderLayout());
+        card.setBackground(CARD_BG);
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
+                new EmptyBorder(20, 20, 20, 20)
+        ));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 300));
+
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(CARD_BG);
+
+        JLabel title = new JLabel("Today's Tasks");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        title.setForeground(TEXT_PRIMARY);
+        header.add(title, BorderLayout.WEST);
+
+        taskListModel = new DefaultListModel<>();
+        taskList = new JList<>(taskListModel);
+        taskList.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        taskList.setBackground(CARD_BG);
+        taskList.setSelectionBackground(new Color(224, 231, 255));
+        taskList.setBorder(new EmptyBorder(10, 0, 0, 0));
+        taskList.setCellRenderer(new TaskListCellRenderer());
+
+        // Add double-click listener for toggling tasks
+        taskList.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                if (evt.getClickCount() == 2) {
+                    int index = taskList.locationToIndex(evt.getPoint());
+                    if (index >= 0) {
+                        String taskStr = taskListModel.get(index);
+                        if (!taskStr.startsWith("🎉") && !taskStr.startsWith("🎯")) {
+                            Integer activePlanId = user.getActivePlanId();
+                            if (activePlanId != null) {
+                                List<StudyTask> tasks = studyTaskDAO.findTodayTasksByPlan(activePlanId);
+                                if (index < tasks.size()) {
+                                    StudyTask task = tasks.get(index);
+                                    String newStatus = "COMPLETED".equals(task.getStatus()) ? "PENDING" : "COMPLETED";
+                                    studyTaskDAO.updateStatus(task.getId(), newStatus);
+                                    refreshStudyPlan(); // Refresh this panel
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        JScrollPane taskScroll = new JScrollPane(taskList);
+        taskScroll.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
+        taskScroll.setPreferredSize(new Dimension(300, 200));
+
+        card.add(header, BorderLayout.NORTH);
+        card.add(taskScroll, BorderLayout.CENTER);
+
+        return card;
     }
 
     private JPanel createSubjectSelectionPanel() {
@@ -434,48 +493,6 @@ public class NormalStudyPlannerFrame extends JFrame {
 
         panel.add(title, BorderLayout.NORTH);
         panel.add(configPanel, BorderLayout.CENTER);
-
-        return panel;
-    }
-
-    private JPanel createPlanTablePanel() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(CARD_BG);
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
-                new EmptyBorder(20, 20, 20, 20)
-        ));
-
-        JLabel title = new JLabel("Your Study Plan");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        title.setForeground(TEXT_PRIMARY);
-        title.setBorder(new EmptyBorder(0, 0, 15, 0));
-
-        String[] columns = {"Day", "Subject", "Time", "Status"};
-        planTableModel = new DefaultTableModel(columns, 0) {
-            public boolean isCellEditable(int r, int c) { return false; }
-        };
-        planTable = new JTable(planTableModel);
-        planTable.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        planTable.setRowHeight(35);
-        planTable.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 13));
-        planTable.getTableHeader().setBackground(new Color(249, 250, 251));
-        planTable.setShowGrid(false);
-        planTable.setIntercellSpacing(new Dimension(0, 0));
-
-        // Center align columns
-        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
-        centerRenderer.setHorizontalAlignment(JLabel.CENTER);
-        for (int i = 0; i < planTable.getColumnCount(); i++) {
-            planTable.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
-        }
-
-        JScrollPane scrollPane = new JScrollPane(planTable);
-        scrollPane.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
-        scrollPane.setPreferredSize(new Dimension(800, 200));
-
-        panel.add(title, BorderLayout.NORTH);
-        panel.add(scrollPane, BorderLayout.CENTER);
 
         return panel;
     }
@@ -653,6 +670,29 @@ public class NormalStudyPlannerFrame extends JFrame {
 
     private void refreshStudyPlan() {
         System.out.println("\n=== REFRESHING STUDY PLAN ===");
+
+        // Refresh today's tasks
+        taskListModel.clear();
+
+        Integer activePlanId = user.getActivePlanId();
+        if (activePlanId != null) {
+            List<StudyTask> todayTasks = studyTaskDAO.findTodayTasksByPlan(activePlanId);
+
+            for (StudyTask task : todayTasks) {
+                String status = "COMPLETED".equals(task.getStatus()) ? "✅ " : "⬜ ";
+                taskListModel.addElement(status + task.getDescription());
+                System.out.println("  Task: " + task.getDescription() + " - " + task.getStatus());
+            }
+
+            if (todayTasks.isEmpty()) {
+                taskListModel.addElement("🎉 No tasks for today! Create a plan and generate tasks.");
+            }
+        } else {
+            taskListModel.addElement("🎯 No active plan selected. Choose a plan from 'View My Plans'.");
+        }
+
+        tasksCard.revalidate();
+        tasksCard.repaint();
     }
 
     private void refreshProfile() {
@@ -787,9 +827,7 @@ public class NormalStudyPlannerFrame extends JFrame {
     }
 
     private void setupEventListeners() {
-        // Task list mouse listener is now handled by DashboardFrame
-        // Removed to avoid NullPointerException
-
+        // Task list mouse listener is now in createTodayTasksPanel()
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowClosing(java.awt.event.WindowEvent e) {
                 int confirm = JOptionPane.showConfirmDialog(
@@ -821,7 +859,7 @@ public class NormalStudyPlannerFrame extends JFrame {
         }
     }
 
-    // Custom cell renderer for task list - kept for reference but not used
+    // Custom cell renderer for task list
     class TaskListCellRenderer extends DefaultListCellRenderer {
         @Override
         public Component getListCellRendererComponent(JList<?> list, Object value,
@@ -836,38 +874,13 @@ public class NormalStudyPlannerFrame extends JFrame {
             } else if (text.startsWith("🎉")) {
                 setForeground(PRIMARY_COLOR);
                 setFont(getFont().deriveFont(Font.ITALIC));
-            } else if (text.startsWith("⬜")) {
+            } else if (text.startsWith("⬜") || text.startsWith("🎯")) {
                 setForeground(TEXT_PRIMARY);
                 setFont(getFont().deriveFont(Font.PLAIN));
             }
 
             setBorder(new EmptyBorder(8, 10, 8, 10));
 
-            return c;
-        }
-    }
-
-    // Custom table cell renderer for status column
-    class StatusCellRenderer extends DefaultTableCellRenderer {
-        @Override
-        public Component getTableCellRendererComponent(JTable table, Object value,
-                                                       boolean isSelected, boolean hasFocus, int row, int column) {
-
-            Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-
-            String status = value.toString();
-            if (status.contains("✅")) {
-                setForeground(SUCCESS_COLOR);
-                setFont(getFont().deriveFont(Font.BOLD));
-            } else if (status.contains("❌")) {
-                setForeground(DANGER_COLOR);
-                setFont(getFont().deriveFont(Font.BOLD));
-            } else {
-                setForeground(WARNING_COLOR);
-                setFont(getFont().deriveFont(Font.PLAIN));
-            }
-
-            setHorizontalAlignment(JLabel.CENTER);
             return c;
         }
     }

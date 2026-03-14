@@ -24,8 +24,6 @@ public class DashboardFrame extends JPanel {
     private JLabel dateLabel;
     private JLabel progressPercentageLabel;
     private JProgressBar dailyProgressBar;
-    private DefaultListModel<String> taskListModel;
-    private JList<String> taskList;
 
     // Colors
     private final Color PRIMARY_COLOR = new Color(79, 70, 229);
@@ -41,7 +39,6 @@ public class DashboardFrame extends JPanel {
         this.studyPlanDAO = new StudyPlanDAO();
 
         initUI();
-        setupDoubleClickListener();
         refreshDashboard();
     }
 
@@ -64,14 +61,9 @@ public class DashboardFrame extends JPanel {
         contentPanel.add(activePlanPanel);
         contentPanel.add(Box.createVerticalStrut(20));
 
-        // Daily Progress Card
+        // Daily Progress Card (ONLY)
         JPanel progressCard = createDailyProgressCard();
         contentPanel.add(progressCard);
-        contentPanel.add(Box.createVerticalStrut(20));
-
-        // Today's Tasks Card
-        JPanel tasksCard = createTodayTasksCard();
-        contentPanel.add(tasksCard);
         contentPanel.add(Box.createVerticalStrut(50));
 
         // Scroll pane
@@ -81,32 +73,6 @@ public class DashboardFrame extends JPanel {
         mainScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 
         add(mainScrollPane, BorderLayout.CENTER);
-    }
-
-    private void setupDoubleClickListener() {
-        taskList.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                if (evt.getClickCount() == 2) {
-                    int index = taskList.locationToIndex(evt.getPoint());
-                    if (index >= 0) {
-                        String taskStr = taskListModel.get(index);
-                        if (!taskStr.startsWith("🎉") && !taskStr.startsWith("🎯")) {
-                            Integer activePlanId = user.getActivePlanId();
-                            if (activePlanId != null) {
-                                List<StudyTask> tasks = studyTaskDAO.findTodayTasksByPlan(activePlanId);
-                                if (index < tasks.size()) {
-                                    StudyTask task = tasks.get(index);
-                                    String newStatus = "COMPLETED".equals(task.getStatus()) ? "PENDING" : "COMPLETED";
-                                    System.out.println("Toggling task " + task.getId() + " to " + newStatus);
-                                    studyTaskDAO.updateStatus(task.getId(), newStatus);
-                                    refreshDashboard();
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        });
     }
 
     private JPanel createHeaderPanel() {
@@ -157,21 +123,17 @@ public class DashboardFrame extends JPanel {
         planNameLabel.setForeground(PRIMARY_COLOR);
 
         Integer activePlanId = user.getActivePlanId();
-        System.out.println("Dashboard - Active Plan ID from user: " + activePlanId);
 
         if (activePlanId != null) {
             StudyPlan plan = studyPlanDAO.findById(activePlanId);
             if (plan != null) {
                 String displayName = plan.getSubjects() != null ? plan.getSubjects() : plan.getSubjectName();
                 planNameLabel.setText(displayName != null ? displayName : "Plan " + activePlanId);
-                System.out.println("Dashboard - Found plan: " + displayName);
             } else {
                 planNameLabel.setText("Plan " + activePlanId + " (not found)");
-                System.out.println("Dashboard - Plan not found in database: " + activePlanId);
             }
         } else {
             planNameLabel.setText("None (select a plan)");
-            System.out.println("Dashboard - No active plan");
         }
         panel.add(planNameLabel);
 
@@ -214,41 +176,6 @@ public class DashboardFrame extends JPanel {
         return card;
     }
 
-    private JPanel createTodayTasksCard() {
-        JPanel card = new JPanel(new BorderLayout());
-        card.setBackground(CARD_BG);
-        card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER_COLOR, 1, true),
-                new EmptyBorder(20, 20, 20, 20)
-        ));
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 300));
-
-        JPanel header = new JPanel(new BorderLayout());
-        header.setBackground(CARD_BG);
-
-        JLabel title = new JLabel("Today's Tasks");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        title.setForeground(TEXT_PRIMARY);
-        header.add(title, BorderLayout.WEST);
-
-        taskListModel = new DefaultListModel<>();
-        taskList = new JList<>(taskListModel);
-        taskList.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        taskList.setBackground(CARD_BG);
-        taskList.setSelectionBackground(new Color(224, 231, 255));
-        taskList.setBorder(new EmptyBorder(10, 0, 0, 0));
-        taskList.setCellRenderer(new TaskListCellRenderer());
-
-        JScrollPane taskScroll = new JScrollPane(taskList);
-        taskScroll.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
-        taskScroll.setPreferredSize(new Dimension(300, 200));
-
-        card.add(header, BorderLayout.NORTH);
-        card.add(taskScroll, BorderLayout.CENTER);
-
-        return card;
-    }
-
     public void refreshDashboard() {
         System.out.println("\n=== REFRESHING DASHBOARD ===");
 
@@ -257,7 +184,6 @@ public class DashboardFrame extends JPanel {
         User latestUser = userDAO.findById(user.getId());
         if (latestUser != null) {
             user.setActivePlanId(latestUser.getActivePlanId());
-            System.out.println("Dashboard - Updated active plan from DB: " + user.getActivePlanId());
         }
 
         Integer activePlanId = user.getActivePlanId();
@@ -267,16 +193,13 @@ public class DashboardFrame extends JPanel {
             progressPercentageLabel.setText("0%");
             dailyProgressBar.setValue(0);
             dailyProgressBar.setString("0% (0/0)");
-            taskListModel.clear();
-            taskListModel.addElement("🎯 No active plan selected. Choose a plan from 'View My Plans'.");
             revalidate();
             repaint();
             return;
         }
 
-        // Get today's tasks for active plan
+        // Get today's tasks for active plan (just for progress calculation)
         List<StudyTask> todayTasks = studyTaskDAO.findTodayTasksByPlan(activePlanId);
-        System.out.println("Dashboard - Found " + todayTasks.size() + " tasks for plan " + activePlanId);
 
         int totalToday = todayTasks.size();
         int completedToday = (int) todayTasks.stream()
@@ -289,47 +212,12 @@ public class DashboardFrame extends JPanel {
         dailyProgressBar.setValue(todayProgress);
         dailyProgressBar.setString(todayProgress + "% (" + completedToday + "/" + totalToday + ")");
 
-        // Update task list
-        taskListModel.clear();
-        for (StudyTask task : todayTasks) {
-            String status = "COMPLETED".equals(task.getStatus()) ? "✅ " : "⬜ ";
-            taskListModel.addElement(status + task.getDescription());
-            System.out.println("Dashboard - Task: " + task.getDescription() + " - " + task.getStatus());
-        }
-        if (todayTasks.isEmpty()) {
-            taskListModel.addElement("🎉 No tasks for today! Check your study plan.");
-        }
-
         revalidate();
         repaint();
     }
 
     public void refresh() {
         refreshDashboard();
-    }
-
-    // Custom cell renderer
-    class TaskListCellRenderer extends DefaultListCellRenderer {
-        @Override
-        public Component getListCellRendererComponent(JList<?> list, Object value,
-                                                      int index, boolean isSelected, boolean cellHasFocus) {
-            Component c = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-
-            String text = value.toString();
-            if (text.startsWith("✅")) {
-                setForeground(SUCCESS_COLOR);
-                setFont(getFont().deriveFont(Font.BOLD));
-            } else if (text.startsWith("🎉") || text.startsWith("🎯")) {
-                setForeground(PRIMARY_COLOR);
-                setFont(getFont().deriveFont(Font.ITALIC));
-            } else if (text.startsWith("⬜")) {
-                setForeground(TEXT_PRIMARY);
-                setFont(getFont().deriveFont(Font.PLAIN));
-            }
-
-            setBorder(new EmptyBorder(8, 10, 8, 10));
-            return c;
-        }
     }
 
     public JPanel getMainPanel() {
